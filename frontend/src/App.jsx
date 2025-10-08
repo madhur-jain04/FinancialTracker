@@ -3,7 +3,6 @@ import PdfUploader  from '../components/PdfUploader';
 import { LogOut, TrendingUp, Wallet, User, PlusCircle, Receipt, CheckCircle, FileText, LayoutDashboard, Search, Calendar, Filter, DollarSign, ArrowUp, ArrowDown } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
-// --- MOCK API INTERACTION AND SETUP ---
 // Note: axios is removed and replaced with a mocked data fetch using Promises for asynchronous behavior simulation.
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -13,7 +12,6 @@ const getAmountColor = (type) => (type === 'Income' ? 'text-green-600' : 'text-r
 const mockDatabase = JSON.parse(localStorage.getItem('mockUsers')) || [];
 const saveMockDatabase = (db) => localStorage.setItem('mockUsers', JSON.stringify(db));
 
-// --- Mock Hashing and Token Generation ---
 // Using a simple Base64/JSON string for demo purposes instead of bcrypt/real JWT for client-side compatibility.
 const mockHash = (password) => btoa(password + 'salt');
 const mockVerify = (password, hash) => mockHash(password) === hash;
