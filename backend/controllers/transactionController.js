@@ -5,6 +5,7 @@ import asyncHandler from 'express-async-handler';
 import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
 dotenv.config();
 
@@ -12,17 +13,21 @@ dotenv.config();
 // --- AI Initialization (Gemini API setup using environment variable) ---
 // ------------------------------------------------------------------
 
-// Load the Gemini API key from .env file
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
+// Load the Gemini API key from .env file (optional)
+const GEMINI_KEY = process.env.GEMINI_API_KEY || null;
 
-// Ensure the key is present before continuing
-if (!GEMINI_KEY) {
-    console.error("FATAL ERROR: GEMINI_API_KEY is undefined.");
-    throw new Error("Missing GEMINI_API_KEY environment variable.");
+// Initialize the Google Gemini AI client only if a key exists
+let ai = null;
+if (GEMINI_KEY) {
+    try {
+        ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+    } catch (err) {
+        console.warn('Could not initialize Gemini AI client:', err.message);
+        ai = null;
+    }
+} else {
+    console.warn('GEMINI_API_KEY not set; AI receipt extraction route will return a helpful error.');
 }
-
-// Initialize the Google Gemini AI client
-const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
 
 // Utility function to convert uploaded files into Gemini-compatible input
 function fileToGenerativePart(path, mimeType) {
@@ -126,6 +131,10 @@ export const extractReceipt = asyncHandler(async (req, res) => {
     }
 
     try {
+        if (!ai) {
+            // If AI client isn't configured, respond with a helpful error
+            return res.status(503).json({ message: 'AI service not configured on server. Set GEMINI_API_KEY to enable this feature.' });
+        }
         // Convert the uploaded image into a Gemini-compatible format
         const imagePart = fileToGenerativePart(req.file.path, req.file.mimetype);
 
@@ -148,7 +157,7 @@ export const extractReceipt = asyncHandler(async (req, res) => {
 
         // Parse and clean the response to get the JSON data
         const jsonText = response.text.trim().replace(/^```json\n?|\n?```$/g, '');
-        const extractedData = JSON.parse(jsonText);
+    const extractedData = JSON.parse(jsonText);
 
         // Delete the uploaded temporary file after processing
         fs.unlinkSync(req.file.path);
@@ -165,3 +174,74 @@ export const extractReceipt = asyncHandler(async (req, res) => {
         throw new Error('AI processing failed or could not extract data. Check API key or image clarity.');
     }
 });
+
+
+// import pdf from 'pdf-parse'; // Library for PDF parsing
+// import fs from 'fs';
+// const Transaction = require('./models/Transaction'); // MongoDB Model
+
+const parseBankStatementText = (filePath) => {
+    // In the real implementation:
+    // 1. Read the file: fs.readFileSync(filePath);
+    // 2. Parse the PDF: const data = await pdf(dataBuffer);
+    // 3. Apply regex/logic to data.text to extract transactions
+    console.log(`[Backend] Simulating parsing of file: ${filePath}`);
+
+    // Return mock structured data ready for MongoDB
+    return [
+        { date: '2024-10-01', description: 'Utility Bill Payment', amount: -85.50, type: 'DEBIT' },
+        { date: '2024-10-02', description: 'Online Store Refund', amount: 35.00, type: 'CREDIT' },
+    ];
+};
+
+// 1. Controller for extracting and saving
+export const extractAndSaveTransactions = async (req, res) => {
+    // Check if the file was uploaded by the multer middleware
+    if (!req.file) {
+        return res.status(400).json({ message: 'No PDF file uploaded.' });
+    }
+
+    const { originalname, path: filePath } = req.file;
+    const userId = req.body.userId; // Assuming userId is passed in the request body/form data
+
+    try {
+        // --- Extraction ---
+        const extractedEntries = parseBankStatementText(filePath); 
+
+        if (extractedEntries.length === 0) {
+            fs.unlinkSync(filePath); // Cleanup file
+            return res.status(200).json({ message: 'No entries found in statement.', count: 0 });
+        }
+
+        // --- Prepare for MongoDB ---
+        const transactionsToInsert = extractedEntries.map(entry => ({
+            user: userId ? mongoose.Types.ObjectId(userId) : new mongoose.Types.ObjectId('60d5ec49c6f2a80015b4f8d1'),
+            type: entry.type === 'CREDIT' ? 'Income' : 'Expense',
+            amount: Math.abs(entry.amount),
+            date: entry.date ? new Date(entry.date) : new Date(),
+            description: entry.description || '',
+            category: entry.category || 'Uncategorized',
+            source: originalname || 'bank-statement.pdf'
+        }));
+
+        // --- MongoDB Save ---
+    const savedTransactions = await Transaction.insertMany(transactionsToInsert);
+        
+        // --- Cleanup ---
+        fs.unlinkSync(filePath); // Delete the temporary file
+
+        res.status(201).json({ 
+            message: 'Transactions extracted and saved successfully.', 
+            count: savedTransactions.length,
+            data: savedTransactions 
+        });
+
+    } catch (error) {
+        // Ensure temporary file is cleaned up on error
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath); 
+        console.error('Extraction Error:', error);
+        res.status(500).json({ message: 'Failed to process PDF.', error: error.message });
+    }
+};
+
+// Keep existing named exports for other controllers (createTransaction, getTransactions, extractReceipt)

@@ -3,6 +3,15 @@ import PdfUploader  from '../components/PdfUploader';
 import { LogOut, TrendingUp, Wallet, User, PlusCircle, Receipt, CheckCircle, FileText, LayoutDashboard, Search, Calendar, Filter, DollarSign, ArrowUp, ArrowDown } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
+// Firebase removed: using backend (Express + MongoDB) for authentication and data storage
+const MOCK_DB = []; 
+let currentMockId = 1001;
+
+// --- Global Variables (Mandatory for Canvas Environment) ---
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+// Firebase config removed; frontend will call backend auth endpoints instead
+
+
 // Note: axios is removed and replaced with a mocked data fetch using Promises for asynchronous behavior simulation.
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -39,6 +48,266 @@ const verifyMockToken = (token) => {
 const cardClass = "bg-white p-6 rounded-2xl shadow-xl transition-shadow duration-300 hover:shadow-2xl border border-gray-100";
 const cardCompactClass = "bg-white p-4 rounded-xl shadow-lg transition-shadow duration-300 hover:shadow-xl border border-gray-100";
 
+const mockApiExtractAndSave = async (pdfFile) => {
+    console.log(`[MOCK API] POST /api/transactions/extract - Received file: ${pdfFile.name}. Simulating processing and saving to DB.`);
+
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const extractedTransactions = [
+                {
+                    id: currentMockId++,
+                    date: new Date().toISOString().split('T')[0],
+                    description: 'Grocery Store Purchase',
+                    amount: -55.99,
+                    type: 'DEBIT',
+                    sourceDoc: pdfFile.name
+                },
+                {
+                    id: currentMockId++,
+                    date: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+                    description: 'Salary Deposit',
+                    amount: 2500.00,
+                    type: 'CREDIT',
+                    sourceDoc: pdfFile.name
+                },
+                {
+                    id: currentMockId++,
+                    date: new Date(Date.now() - 172800000).toISOString().split('T')[0], // Two days ago
+                    description: 'Netflix Subscription',
+                    amount: -15.49,
+                    type: 'DEBIT',
+                    sourceDoc: pdfFile.name
+                },
+            ];
+
+            // SIMULATE MONGODB SAVE: Push new entries to the mock database
+            MOCK_DB.push(...extractedTransactions);
+            
+            console.log(`[MOCK API] Successfully saved ${extractedTransactions.length} entries to MongoDB.`);
+            resolve({ success: true, count: extractedTransactions.length });
+        }, 2000); // Simulate network and processing delay
+    });
+};
+
+// --- Custom Components ---
+const mockApiFetchTransactions = () => {
+    console.log(`[MOCK API] GET /api/transactions - Simulating fetching all saved entries.`);
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            // Sort by date (newest first)
+            const sortedData = [...MOCK_DB].sort((a, b) => new Date(b.date) - new Date(a.date));
+            resolve(sortedData);
+        }, 500); // Small delay for fetch simulation
+    });
+};
+
+const LoadingSpinner = () => (
+    <div className="flex items-center justify-center p-4">
+        <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Processing...
+    </div>
+);
+
+// --- Feature Component (Called from App) ---
+
+const PdfUploaderAndProcessor = () => {
+    const [file, setFile] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [isLoadingData, setIsLoadingData] = useState(false);
+    const [message, setMessage] = useState('');
+    const [transactions, setTransactions] = useState([]);
+    const [isSnackbarVisible, setIsSnackbarVisible] = useState(false);
+
+
+    const loadTransactions = useCallback(async () => {
+        setIsLoadingData(true);
+        try {
+            const data = await mockApiFetchTransactions();
+            setTransactions(data);
+        } catch (error) {
+            console.error("Error loading transactions:", error);
+        } finally {
+            setIsLoadingData(false);
+        }
+    }, []);
+
+    // 1. Initial Data Load (Simulates componentDidMount)
+    useEffect(() => {
+        loadTransactions();
+    }, [loadTransactions]);
+
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile && selectedFile.type === 'application/pdf') {
+            setFile(selectedFile);
+            setMessage(`PDF selected: ${selectedFile.name}`);
+        } else {
+            setFile(null);
+            setMessage('Please select a valid PDF file.');
+            e.target.value = null; // Clear file input
+        }
+    };
+
+    const handleProcessAndSave = async () => {
+        if (!file) {
+            setMessage('Please select a PDF file first.');
+            return;
+        }
+
+        setIsProcessing(true);
+        setMessage(`Processing PDF: ${file.name}... (Simulating API call to MongoDB backend)`);
+
+        try {
+            // --- STEP 1: Simulate API Extraction and MongoDB Save ---
+            const result = await mockApiExtractAndSave(file);
+
+            if (result.count === 0) {
+                setMessage('Processing complete, but no entries were extracted.');
+                setIsProcessing(false);
+                return;
+            }
+
+            // --- STEP 2: Refresh Data from Backend ---
+            await loadTransactions(); 
+
+            setMessage(`Successfully extracted and saved ${result.count} transactions to MongoDB.`);
+            setIsSnackbarVisible(true);
+            setTimeout(() => setIsSnackbarVisible(false), 3000); // Hide snackbar after 3s
+
+            // Reset file input after successful save
+            setFile(null);
+            document.getElementById('pdf-upload-input').value = null;
+
+        } catch (error) {
+            console.error("Extraction or saving failed:", error);
+            setMessage(`An error occurred: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const getAmountStyle = (amount) => {
+        if (amount > 0) return 'text-green-600 font-semibold';
+        if (amount < 0) return 'text-red-600 font-semibold';
+        return 'text-gray-600';
+    };
+
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+        }).format(Math.abs(amount));
+    };
+
+    return (
+        <div className="p-4 md:p-8 space-y-8">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-indigo-100">
+                <h2 className="text-2xl font-bold text-indigo-700 mb-4">PDF Statement Uploader</h2>
+                <p className="text-sm text-gray-500 mb-6">
+                    Select a bank statement PDF. The system simulates calling a MongoDB Atlas backend
+                    to extract transactions (Date, Description, Amount) and save them.
+                    <span className="font-medium text-red-500 block mt-1">
+                        NOTE: Actual PDF parsing and MongoDB connection are simulated in this environment.
+                    </span>
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4">
+                    <div className="flex-grow">
+                        <label htmlFor="pdf-upload-input" className="block text-sm font-medium text-gray-700 mb-1">Upload PDF File</label>
+                        <input
+                            type="file"
+                            id="pdf-upload-input"
+                            accept="application/pdf"
+                            onChange={handleFileChange}
+                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition duration-150"
+                            disabled={isProcessing}
+                        />
+                    </div>
+                    <button
+                        onClick={handleProcessAndSave}
+                        disabled={!file || isProcessing}
+                        className={`py-2 px-6 rounded-lg font-semibold transition duration-150 shadow-md transform hover:scale-[1.01] ${!file || isProcessing ? 'bg-gray-400 text-gray-700 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white'}`}
+                    >
+                        {isProcessing ? <LoadingSpinner /> : 'Process & Save Entries'}
+                    </button>
+                </div>
+
+                {message && (
+                    <p className={`mt-4 text-sm ${isProcessing ? 'text-indigo-600' : (message.includes('Error') ? 'text-red-500' : 'text-gray-600')}`}>
+                        {message}
+                    </p>
+                )}
+            </div>
+
+            {/* Transaction List */}
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-indigo-100">
+                <h2 className="text-2xl font-bold text-indigo-700 mb-4">Saved Transactions ({transactions.length})</h2>
+
+                {isLoadingData ? (
+                    <div className="flex items-center justify-center p-8 text-indigo-600">
+                        <LoadingSpinner />
+                        <p className="ml-2">Loading data from MongoDB...</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto rounded-lg shadow-inner border border-gray-200">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {transactions.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                                            No transactions saved yet. Upload a PDF to start.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    transactions.map((tx) => (
+                                        <tr key={tx.id} className="hover:bg-indigo-50 transition duration-150">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tx.date}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                {tx.description}
+                                                <p className="text-xs text-gray-400 truncate">Source: {tx.sourceDoc}</p>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${tx.type === 'CREDIT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                    {tx.type}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                                                <span className={getAmountStyle(tx.amount)}>
+                                                    {formatCurrency(tx.amount)}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Snackbar for Success Message */}
+            <div className={`fixed bottom-5 right-5 transition-transform duration-500 ${isSnackbarVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                <div className="bg-green-600 text-white p-4 rounded-lg shadow-xl flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Transactions saved successfully to MongoDB!</span>
+                </div>
+            </div>
+        </div>
+    );
+};
 // Sample Data to simulate a backend response
 const initialSampleTransactions = [
   // Jan - Jun 2025 Data (for charts)
@@ -490,65 +759,91 @@ function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('userToken') || null);
   const [authError, setAuthError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [protectedData, setProtectedData] = useState('Awaiting authorization check...');
+  
+    const [db, setDb] = useState(null);
+    const [auth, setAuth] = useState(null);
+    const [userId, setUserId] = useState(null);
 
-  const handleRegister = (email, password) => {
-      setAuthError('');
-      setIsLoading(true);
-      // 1. Check if user exists (MongoDB logic)
-      if (mockDatabase.find(u => u.email === email)) {
-        setAuthError('User with this email already exists.');
-        setIsLoading(false);
+  const handleRegister = async (email, password) => {
+    setAuthError('');
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: email, email, password }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setAuthError(body.message || 'Registration failed');
         return;
       }
-  
-      // 2. Hash password (Mongoose pre-save hook logic)
-      const hashedPassword = mockHash(password);
-      const newUser = {
-        _id: Date.now().toString(),
-        email,
-        password: hashedPassword, // Store the mock hash
-      };
-  
-      mockDatabase.push(newUser);
-      saveMockDatabase(mockDatabase);
-  
-      // 3. Create token and respond (Controller logic)
-      const newToken = createMockToken(newUser._id);
-      localStorage.setItem('userToken', newToken);
-      setToken(newToken);
-      setUser({ id: newUser._id, email: newUser.email });
-      setView('dashboard');
+      // Auto-login after register
+      await handleLogin(email, password);
+    } catch (err) {
+      console.error('Register error', err);
+      setAuthError('Registration failed');
+    } finally {
       setIsLoading(false);
-    };
-  
-    const handleLogin = (email, password) => {
-      setAuthError('');
-      setIsLoading(true);
-      // 1. Find user (MongoDB logic)
-      const user = mockDatabase.find(u => u.email === email);
-      if (!user) {
-        setAuthError('Invalid credentials.');
-        setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async (email, password) => {
+    setAuthError('');
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.message || 'Login failed');
         return;
       }
-  
-      // 2. Match password (UserSchema.methods.matchPassword logic)
-      if (!mockVerify(password, user.password)) {
-        setAuthError('Invalid credentials.');
-        setIsLoading(false);
-        return;
-      }
-  
-      // 3. Create token and respond (Controller logic)
-      const newToken = createMockToken(user._id);
-      localStorage.setItem('userToken', newToken);
-      setToken(newToken);
-      setUser({ id: user._id, email: user.email });
+      const { token: receivedToken, user: receivedUser } = data;
+      localStorage.setItem('userToken', receivedToken);
+      localStorage.setItem('user', JSON.stringify(receivedUser));
+      setToken(receivedToken);
+      setUser(receivedUser);
       setView('dashboard');
+    } catch (err) {
+      console.error('Login error', err);
+      setAuthError('Login failed');
+    } finally {
       setIsLoading(false);
-    };
+    }
+  };
+
+  useEffect(() => {
+    // Initialize auth state from localStorage (token + user)
+    const storedToken = localStorage.getItem('userToken');
+    const storedUser = localStorage.getItem('user');
+    if (storedToken) setToken(storedToken);
+    if (storedUser) setUser(JSON.parse(storedUser));
+    setIsLoading(false);
+  }, []);
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
+                <LoadingSpinner />
+                <p className="text-gray-600 ml-2">Connecting to secure services...</p>
+            </div>
+        );
+    }
+
+    if (authError) {
+        return (
+            <div className="text-center p-8 bg-red-100 text-red-700 rounded-lg m-8 shadow-md">
+                <h1 className="text-xl font-bold">Authentication Error</h1>
+                <p>{authError}</p>
+            </div>
+        );
+    }
     
     const handleLogout = () => {
       localStorage.removeItem('userToken');
@@ -561,49 +856,41 @@ function App() {
   
     // --- Protected Route Simulation (Middleware Logic) ---
   
-    const accessProtectedResource = useCallback(() => {
+    const accessProtectedResource = useCallback(async () => {
       if (!token) {
         setProtectedData('Authorization Denied: No token provided.');
         return;
       }
-  
-      // Simulate sending token in the request header
-      // const headers = { 'Authorization': `Bearer ${token}` };
-  
-      // 1. Run Auth Middleware (middleware/authMiddleware.js logic)
-      const userId = verifyMockToken(token); 
-  
-      if (!userId) {
-          setProtectedData('Authorization Denied: Invalid or expired token.');
-          handleLogout();
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/transactions`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            setProtectedData('Authorization Denied: Invalid or expired token.');
+            handleLogout();
+            return;
+          }
+          setProtectedData('Failed to access protected resource.');
           return;
+        }
+        setProtectedData('✅ Access Granted! Successfully fetched protected transactions.');
+      } catch (err) {
+        console.error('Protected access error:', err);
+        setProtectedData('Failed to access protected resource.');
       }
-      
-      // 2. Successful Authorization: Fetch data for req.user.id (Controller logic)
-      setProtectedData(`✅ Access Granted! Successfully fetched financial data for user ID: ${userId}`);
-  
     }, [token, handleLogout]);
 
-    useEffect(() => {
-        if (token) {
-            const userId = verifyMockToken(token);
-            if (userId) {
-                // Find user details (simulating database lookup after token verification)
-                const userData = mockDatabase.find(u => u._id === userId);
-                if (userData) {
-                    setUser({ id: userData._id, email: userData.email });
-                    setView('dashboard');
-                } else {
-                    // Token is valid but user ID not found in DB
-                    handleLogout();
-                }
-            } else {
-                handleLogout();
-            }
-        } else {
-          setView('login');
-        }
-      }, [token]);
+  useEffect(() => {
+    if (token) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) setUser(JSON.parse(storedUser));
+      setView('dashboard');
+    } else {
+      setView('login');
+    }
+  }, [token]);
     
       // Re-run protected access check when dashboard is visible
       useEffect(() => {
@@ -970,7 +1257,7 @@ function App() {
               <div className="border-2 border-dashed border-indigo-300 bg-indigo-50 rounded-xl p-12 text-center hover:border-indigo-500 transition-colors cursor-pointer">
                 <FileText className="w-16 h-16 text-indigo-400 mx-auto mb-4" />
                 <p className="text-indigo-600 font-semibold">Click or drag a PDF statement here</p>
-                <PdfUploader onTransactionCreated={handleNewTransaction} API_BASE_URL={API_BASE_URL} />
+                 <PdfUploaderAndProcessor />
               </div>
             </div>
           </div>
