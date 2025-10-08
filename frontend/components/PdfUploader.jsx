@@ -33,32 +33,6 @@ const ExtractedReviewTable = ({ items, onTransactionCreated }) => {
             body: JSON.stringify(dataToSend)
         });
 
-        // try {
-        //     // Data format cleanup (matching MongoDB schema)
-        //     const dataToSend = {
-        //         type: item.type === 'Income' ? 'Income' : 'Expense',
-        //         amount: parseFloat(item.amount),
-        //         category: item.category || 'Uncategorized',
-        //         description: item.description || 'PDF Import Entry',
-        //         date: item.date || new Date().toISOString(),
-        //         source: 'PDF Upload',
-        //     };
-
-        //     const response = await axios.post(`${API_BASE_BASE}/transactions`, dataToSend);
-            
-        //     if (response.status === 201) {
-        //         onTransactionCreated(response.data); 
-        //         setStatus(prev => prev.map((s, i) => i === index ? 'saved' : s));
-        //         toast.success(`Row ${index + 1} saved!`);
-        //     } else {
-        //         throw new Error(response.data?.message || 'DB save failed');
-        //     }
-
-        // } catch (error) {
-        //     setStatus(prev => prev.map((s, i) => i === index ? 'error' : s));
-        //     console.error(`Error saving row ${index + 1}:`, error);
-        //     toast.error(`Error on row ${index + 1}`);
-        // }
     };
 
     return (
