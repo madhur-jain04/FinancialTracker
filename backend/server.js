@@ -4,15 +4,12 @@ import authRoutes from './routes/authRoutes.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 import connectDB from "./config/db.js";
-// import { connectDB } from './db.js';
 require('dotenv').config();
 
 import mongoose from 'mongoose';
 import cors from 'cors';
 // We need to create this file next:
 import transactionRoutes from './routes/transactionRoutes.js';
-
-// dotenv.config(); // Load variables from .env
 
 const app = express();
 const PORT = process.env.PORT || 5000;
