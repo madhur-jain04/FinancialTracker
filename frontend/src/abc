@@ -1,0 +1,274 @@
+import React, { useState, useEffect, useCallback } from 'react';
+// Note: In a real MERN app, the hashing and JWT creation happens on the Express server.
+// Here, we simulate that logic client-side for the purpose of a runnable demo.
+
+// --- Mock Database (Simulates MongoDB) ---
+// In a real application, this would be a MongoDB connection.
+const mockDatabase = JSON.parse(localStorage.getItem('mockUsers')) || [];
+const saveMockDatabase = (db) => localStorage.setItem('mockUsers', JSON.stringify(db));
+
+// --- Mock Hashing and Token Generation ---
+// Using a simple Base64/JSON string for demo purposes instead of bcrypt/real JWT for client-side compatibility.
+const mockHash = (password) => btoa(password + 'salt');
+const mockVerify = (password, hash) => mockHash(password) === hash;
+
+const createMockToken = (userId) => {
+  const payload = { id: userId, iat: Date.now() };
+  // Simulate token as base64-encoded user ID
+  return btoa(JSON.stringify(payload));
+};
+
+const verifyMockToken = (token) => {
+    try {
+        const payload = JSON.parse(atob(token));
+        // A basic check to ensure the payload structure is present
+        if (payload && payload.id) {
+            return payload.id;
+        }
+    } catch (e) {
+        return null; // Invalid token format
+    }
+    return null;
+};
+
+
+// --- App Component ---
+const App = () => {
+  const [view, setView] = useState('login'); // 'login', 'register', 'dashboard'
+  const [user, setUser] = useState(null); // { id: '...', email: '...' }
+  const [token, setToken] = useState(localStorage.getItem('userToken') || null);
+  const [authError, setAuthError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [protectedData, setProtectedData] = useState('Awaiting authorization check...');
+
+  // --- Core Authentication Handlers (Simulating Express/MongoDB Logic) ---
+
+  const handleRegister = (email, password) => {
+    setAuthError('');
+    setIsLoading(true);
+    // 1. Check if user exists (MongoDB logic)
+    if (mockDatabase.find(u => u.email === email)) {
+      setAuthError('User with this email already exists.');
+      setIsLoading(false);
+      return;
+    }
+
+    // 2. Hash password (Mongoose pre-save hook logic)
+    const hashedPassword = mockHash(password);
+    const newUser = {
+      _id: Date.now().toString(),
+      email,
+      password: hashedPassword, // Store the mock hash
+    };
+
+    mockDatabase.push(newUser);
+    saveMockDatabase(mockDatabase);
+
+    // 3. Create token and respond (Controller logic)
+    const newToken = createMockToken(newUser._id);
+    localStorage.setItem('userToken', newToken);
+    setToken(newToken);
+    setUser({ id: newUser._id, email: newUser.email });
+    setView('dashboard');
+    setIsLoading(false);
+  };
+
+  const handleLogin = (email, password) => {
+    setAuthError('');
+    setIsLoading(true);
+    // 1. Find user (MongoDB logic)
+    const user = mockDatabase.find(u => u.email === email);
+    if (!user) {
+      setAuthError('Invalid credentials.');
+      setIsLoading(false);
+      return;
+    }
+
+    // 2. Match password (UserSchema.methods.matchPassword logic)
+    if (!mockVerify(password, user.password)) {
+      setAuthError('Invalid credentials.');
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Create token and respond (Controller logic)
+    const newToken = createMockToken(user._id);
+    localStorage.setItem('userToken', newToken);
+    setToken(newToken);
+    setUser({ id: user._id, email: user.email });
+    setView('dashboard');
+    setIsLoading(false);
+  };
+  
+  const handleLogout = () => {
+    localStorage.removeItem('userToken');
+    setToken(null);
+    setUser(null);
+    setProtectedData('Awaiting authorization check...');
+    setView('login');
+  };
+
+  // --- Protected Route Simulation (Middleware Logic) ---
+
+  const accessProtectedResource = useCallback(() => {
+    if (!token) {
+      setProtectedData('Authorization Denied: No token provided.');
+      return;
+    }
+
+    // Simulate sending token in the request header
+    // const headers = { 'Authorization': `Bearer ${token}` };
+
+    // 1. Run Auth Middleware (middleware/authMiddleware.js logic)
+    const userId = verifyMockToken(token); 
+
+    if (!userId) {
+        setProtectedData('Authorization Denied: Invalid or expired token.');
+        handleLogout();
+        return;
+    }
+    
+    // 2. Successful Authorization: Fetch data for req.user.id (Controller logic)
+    setProtectedData(`✅ Access Granted! Successfully fetched financial data for user ID: ${userId}`);
+
+  }, [token, handleLogout]);
+
+  // Check token on load or token change
+  useEffect(() => {
+    if (token) {
+        const userId = verifyMockToken(token);
+        if (userId) {
+            // Find user details (simulating database lookup after token verification)
+            const userData = mockDatabase.find(u => u._id === userId);
+            if (userData) {
+                setUser({ id: userData._id, email: userData.email });
+                setView('dashboard');
+            } else {
+                // Token is valid but user ID not found in DB
+                handleLogout();
+            }
+        } else {
+            handleLogout();
+        }
+    } else {
+      setView('login');
+    }
+  }, [token]);
+
+  // Re-run protected access check when dashboard is visible
+  useEffect(() => {
+      if (view === 'dashboard' && token) {
+          accessProtectedResource();
+      }
+  }, [view, token, accessProtectedResource]);
+
+
+  // --- Sub-Components for UI ---
+
+  const AuthForm = ({ type }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      if (type === 'login') {
+        handleLogin(email, password);
+      } else {
+        handleRegister(email, password);
+      }
+    };
+    
+    const title = type === 'login' ? 'Sign In' : 'Sign Up';
+    const action = type === 'login' ? 'Login' : 'Register';
+
+    return (
+        <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white p-8 rounded-xl shadow-2xl">
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 text-center">{title}</h2>
+            {authError && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
+                    <p className="font-bold">Error</p>
+                    <p className="text-sm">{authError}</p>
+                </div>
+            )}
+            <div className="space-y-4">
+                <input 
+                    type="email" 
+                    placeholder="Email Address" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                />
+                <input 
+                    type="password" 
+                    placeholder="Password" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                />
+            </div>
+            <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            >
+                {isLoading ? 'Processing...' : action}
+            </button>
+            <p className="mt-4 text-center text-sm text-gray-600">
+                {type === 'login' ? "Don't have an account?" : "Already have an account?"}
+                <button 
+                    type="button"
+                    onClick={() => setView(type === 'login' ? 'register' : 'login')}
+                    className="text-blue-600 hover:text-blue-800 font-semibold ml-1"
+                >
+                    {type === 'login' ? 'Sign Up' : 'Sign In'}
+                </button>
+            </p>
+        </form>
+    );
+  };
+
+  const Dashboard = () => (
+    <div className="w-full max-w-3xl bg-white p-10 rounded-xl shadow-2xl">
+      <div className="flex justify-between items-start mb-8">
+        <h2 className="text-4xl font-bold text-gray-900">Financial Dashboard</h2>
+        <button 
+            onClick={handleLogout} 
+            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-md"
+        >
+          Sign Out
+        </button>
+      </div>
+
+      <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <p className="text-lg font-semibold text-blue-800">Welcome, {user.email}!</p>
+        <p className="text-sm text-gray-600 mt-1">Your MERN stack authentication is working.</p>
+        <p className="text-xs font-mono text-gray-500 mt-2 break-all">
+            Token: <span className="font-bold text-blue-600">{token.substring(0, 50)}...</span>
+        </p>
+      </div>
+
+      <div className="p-6 bg-green-50 rounded-lg border-2 border-green-300">
+        <h3 className="text-xl font-bold text-green-800 mb-3">Protected API Route (`/api/transactions`)</h3>
+        <p className="text-gray-700 font-mono text-sm">{protectedData}</p>
+        <p className="mt-3 text-sm text-gray-600">This simulates your Express server verifying the token using the `protect` middleware and fetching user-specific data from MongoDB (`req.user.id`).</p>
+      </div>
+      
+      <p className="mt-8 text-center text-sm text-gray-500">
+          *Note: User data and token persistence are handled via `localStorage` for this demo.*
+      </p>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      {view === 'login' && <AuthForm type="login" />}
+      {view === 'register' && <AuthForm type="register" />}
+      {view === 'dashboard' && user && <Dashboard />}
+    </div>
+  );
+};
+
+export default App;

@@ -1,0 +1,27 @@
+/* frontend/src/index.css */
+
+
+/* These are the core Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Any custom CSS can go here, but keep it minimal */
+
+/* // frontend/src/index.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities; */
+
+/* Custom styles for consistent look */
+@layer components {
+  .card {
+    @apply bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+  }
+  .nav-button {
+    @apply flex items-center space-x-2 px-4 py-2 rounded-lg transition-all text-gray-600 hover:text-gray-900;
+  }
+}
