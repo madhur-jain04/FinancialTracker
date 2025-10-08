@@ -137,9 +137,3 @@ Frontend will be available at:
 ## 🧑‍💻 Author
 
 **Madhur Jain**
-🚀 MERN Stack Developer | AI & Fullstack Enthusiast
-📧 [Contact me](mailto:your.email@example.com) | 🌐 [GitHub](https://github.com/your-github-username)
-
----
-
-Would you like me to make it **auto-generate GitHub badges** (for tech stack, license, stars, etc.) and make the README look **more professional like a top open-source repo** (with preview image and buttons)?
