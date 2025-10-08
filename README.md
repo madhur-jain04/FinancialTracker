@@ -5,20 +5,24 @@ It provides a secure and intuitive platform to **manage income, track expenses, 
 
 ---
 
-## ✨ Key Features
+## Key features
 
-| Feature                           | Description                                                                                                          | Status        |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------- |
-| 🔐 **Full User Authentication**   | Secure registration and login using JWT (JSON Web Tokens). All core API routes are protected via Axios interceptors. | ✅ Implemented |
-| 📊 **Dashboard & Analytics**      | Real-time summary cards and Recharts visualizations (Monthly Trend, Category Pie).                                   | ✅ Implemented |
-| 💸 **Transaction Management**     | CRUD operations for manual entries, plus filtering by date, type, and search term.                                   | ✅ Implemented |
-| 📄 **AI Receipt Scanning (Mock)** | Simulated AI endpoints to auto-generate transactions from receipt or PDF input.                                      | ✅ Implemented |
+| Feature                  |                                                      What it does | Status |
+| ------------------------ | ----------------------------------------------------------------: | :----: |
+| User auth (JWT + bcrypt) |         Secure registration, login, token refresh, protected APIs |    ✅   |
+| Multi-user isolation     |                  Each user has separate transactions and profiles |    ✅   |
+| Transaction CRUD         |          Create, read (with filters & pagination), update, delete |    ✅   |
+| Filters & search         | Date range, type (income/expense), category, and full-text search |    ✅   |
+| Dashboard charts         |                     Monthly trend + category breakdown (Recharts) |    ✅   |
+| Receipt parsing (mock)   |    Upload image/PDF → mocked AI returns structured transaction(s) |    ✅   |
+| PDF table parsing        |             Pulls rows from tabular PDFs and creates transactions |    ✅   |
+
 
 ---
 
 ## 🛠️ Tech Stack
 
-### 🖥️ Frontend (Client)
+###  Frontend (Client)
 
 | Technology        | Purpose                                    |
 | ----------------- | ------------------------------------------ |
@@ -38,7 +42,7 @@ It provides a secure and intuitive platform to **manage income, track expenses, 
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 .
@@ -62,9 +66,9 @@ It provides a secure and intuitive platform to **manage income, track expenses, 
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
-### 📋 Prerequisites
+###  Prerequisites
 
 * [Node.js](https://nodejs.org/) (v18+)
 * [MongoDB](https://www.mongodb.com/) URI (local or cloud)
@@ -93,11 +97,11 @@ npm start
 ```
 
 API will be available at:
-👉 `http://localhost:5000/api`
+ `http://localhost:5000/api`
 
 ---
 
-### 💻 2. Frontend Setup
+###  2. Frontend Setup
 
 ```bash
 cd frontend
@@ -111,11 +115,11 @@ npm run dev
 ```
 
 Frontend will be available at:
-👉 `http://localhost:5173/`
+ `http://localhost:5173/`
 
 ---
 
-## 🔐 Environment Variables
+##  Environment Variables
 
 | Variable     | Description                         |
 | ------------ | ----------------------------------- |
@@ -127,13 +131,13 @@ Frontend will be available at:
 
 ## 📈 Future Enhancements
 
-* ✅ Real-time expense insights using AI
-* 🧾 PDF statement import (actual parsing)
-* 📤 CSV / Excel export integration
-* 🔔 Email / SMS budget reminders
+*  Real-time expense insights using AI
+*  PDF statement import (actual parsing)
+*  CSV / Excel export integration
+*  Email / SMS budget reminders
 
 ---
 
-## 🧑‍💻 Author
+##  Author
 
 **Madhur Jain**
